@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use reqwest::blocking::{multipart::Form, Client};
+use reqwest::blocking::{
+    multipart::{Form, Part},
+    Client,
+};
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -17,7 +20,7 @@ impl CKAN {
         CKAN {
             url: url.trim_matches('/').to_owned(),
             client: Client::new(),
-            token: None
+            token: None,
         }
     }
 
@@ -40,7 +43,7 @@ impl CKAN {
 
         req = match action.params {
             Params::Empty => req,
-            Params::Multipart(plain, files) => {
+            Params::Multipart(plain, files, blobs) => {
                 let mut form = Form::new();
                 for (k, v) in plain.into_iter() {
                     form = form.text(k, v);
@@ -51,6 +54,16 @@ impl CKAN {
                         Ok(form) => form,
                         Err(err) => return Response::FileError(err.to_string()),
                     };
+                }
+
+                for (k, v) in blobs.into_iter() {
+                    form = form.part(
+                        k,
+                        Part::bytes(v)
+                            .file_name("upload")
+                            .mime_str("application/octet-stream")
+                            .expect("Unexpected content type"),
+                    );
                 }
 
                 req.multipart(form)
@@ -121,7 +134,11 @@ impl Action {
 #[derive(Debug)]
 pub enum Params {
     Empty,
-    Multipart(HashMap<String, String>, HashMap<String, String>),
+    Multipart(
+        HashMap<String, String>,
+        HashMap<String, String>,
+        HashMap<String, Vec<u8>>,
+    ),
     Json(Value),
 }
 
@@ -130,21 +147,21 @@ pub enum Params {
 mod tests {
     // use super::*;
 
-//     #[test]
-//     fn test_name() {
-//         let ckan = CKAN::new("http://localhost:5000");
+    //     #[test]
+    //     fn test_name() {
+    //         let ckan = CKAN::new("http://localhost:5000");
 
-//         let mut plain: HashMap<String, String> = HashMap::new();
-//         plain.insert("rows".into(), "0".into());
-//         plain.insert("fl".into(), "id".into());
+    //         let mut plain: HashMap<String, String> = HashMap::new();
+    //         plain.insert("rows".into(), "0".into());
+    //         plain.insert("fl".into(), "id".into());
 
-//         let action = Action::new(
-//             "package_search",
-//             // Params::Json(serde_json::json!({"rows": 1, "fl": "id"})),
-//             Params::Multipart(plain, HashMap::new()),
-//         );
+    //         let action = Action::new(
+    //             "package_search",
+    //             // Params::Json(serde_json::json!({"rows": 1, "fl": "id"})),
+    //             Params::Multipart(plain, HashMap::new()),
+    //         );
 
-//         let result: Response<Value> = ckan.invoke(action);
-//         // dbg!(result);
-//     }
+    //         let result: Response<Value> = ckan.invoke(action);
+    //         // dbg!(result);
+    //     }
 }
